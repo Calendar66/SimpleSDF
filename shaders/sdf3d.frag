@@ -251,12 +251,38 @@ float sdU(in vec3 p, in float r, in float le, vec2 w) { // U形
 // d1和d2的.x是距离，.y是材质ID
 vec2 opU(vec2 d1, vec2 d2) { return (d1.x < d2.x) ? d1 : d2; }
 
+// SDF操作：平滑并集(Smooth Union)。使用opSmoothUnion函数进行平滑混合
+float opSmoothUnion(float d1, float d2, float k) {
+    float h = clamp(0.5 + 0.5*(d2-d1)/k, 0.0, 1.0);
+    return mix(d2, d1, h) - k*h*(1.0-h);
+}
+
+// 平滑并集操作，保持材质ID（选择距离更近的物体的材质）
+vec2 opSmoothU(vec2 d1, vec2 d2, float k) {
+    float smoothDist = opSmoothUnion(d1.x, d2.x, k);
+    float matID = (d1.x < d2.x) ? d1.y : d2.y;
+    return vec2(smoothDist, matID);
+}
+
 // map函数：定义整个3D场景。
 // 输入一个空间点pos，返回场景中离此点最近的物体的(距离, 材质ID)。
-// 这是所有SDF渲染的核心，通过组合不同的SDF几何体来“搭建”场景。
+// 这是所有SDF渲染的核心，通过组合不同的SDF几何体来"搭建"场景。
 vec2 map(in vec3 pos) {
   // res的x是距离，y是材质ID。初始时，我们假定场景中只有y=0的平面。
   vec2 res = vec2(pos.y, 0.0); 
+
+  // --- 鼠标跟随球体 ---
+  // 将鼠标坐标从屏幕空间转换到3D世界空间
+  vec2 mouseNorm = iMouse.xy / max(iResolution.xy, vec2(1.0));
+  vec3 mouseBallPos = vec3(
+    mix(-2.5, 2.5, mouseNorm.x),           // X: 映射到场景宽度
+    0.4,                                    // Y: 固定高度，略高于其他物体
+    mix(1.5, -3.5, mouseNorm.y)           // Z: 映射到场景深度（Y轴反转）
+  );
+  
+  // 创建鼠标球体（半径 0.2）
+  float mouseBallDist = sdSphere(pos - mouseBallPos, 0.2);
+  vec2 mouseBall = vec2(mouseBallDist, 99.0); // 材质ID 99.0 用于鼠标球
 
   // 下面的代码通过检查包围盒(sdBox)来剔除无关计算，提高效率
   // 如果点pos在某个大区域内，才计算该区域内的所有小物体
@@ -337,6 +363,16 @@ vec2 map(in vec3 pos) {
     res = opU(res, vec2(sdRoundCone(pos - vec3(2.0, 0.20, 1.0), 0.2, 0.1, 0.3),
                         37.0));
   }
+  
+  // Apply smooth blending between mouse ball and scene objects
+  const float blendRadius = 0.25;
+  
+  if (mouseBallDist < blendRadius) {
+      res = opSmoothU(res, mouseBall, blendRadius);
+  } else {
+      res = opU(res, mouseBall);
+  }
+  
   return res;
 }
 

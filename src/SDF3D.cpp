@@ -3,7 +3,7 @@
  * @Date         : 2025-08-20 10:15:03
  * @Description  : 
  * @FilePath     : SDF3D.cpp
- * @LastEditTime : 2025-09-07 16:29:07
+ * @LastEditTime : 2025-09-11 16:22:05
  * @LastEditors  : Calendar66 calendarsunday@163.com
  * @Version      : V1.0.0
  * Copyright 2025 CalendarSUNDAY, All Rights Reserved. 
@@ -40,8 +40,28 @@
      if (!glfwInit()) {
          throw std::runtime_error("Failed to initialize GLFW");
      }
+     
+#if !defined(__OHOS__)
+     // Monitor selection logic
+     int monitorCount = 0;
+     GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+     GLFWmonitor* chosenMonitor = nullptr;
+     if (monitors && monitorCount > 0) {
+         int index = kMonitorIndex;
+         if (index >= 0 && index < monitorCount) {
+             chosenMonitor = monitors[index];
+         }
+     }
+     if (!chosenMonitor) {
+         chosenMonitor = glfwGetPrimaryMonitor();
+     }
+     
+     const GLFWvidmode* mode = glfwGetVideoMode(chosenMonitor);
+#else
      GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
      const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+#endif
+     
      int windowWidth = mode->width;
      int windowHeight = mode->height;
      glfwTerminate();
@@ -83,8 +103,9 @@
      createDescriptorSetLayout();
      createDescriptorSets();
      createPipeline();
-     createCommandBuffers();
-     syncManager->createFrameSynchronization(frameNum);
+    createCommandBuffers();
+    syncManager->createFrameSynchronization(frameNum);
+    setupMouseCallback();
  }
  
  void SDF3D::createRenderPass() {
@@ -237,12 +258,14 @@
  }
  
  void SDF3D::createUniformBuffer() {
-     uniformBuffer = ev::ResourceUtils::createBuffer(
-         device,
-         sizeof(ShaderToy3DUniforms),
-         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-         &uniformBufferAllocation);
+    auto builder = resourceManager->createBuffer();
+    uniformBuffer = builder
+        .setSize(sizeof(ShaderToy3DUniforms))
+        .setUsage(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+        .setMemoryUsage(VMA_MEMORY_USAGE_CPU_TO_GPU)
+        .setMemoryProperties(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+        .setMemoryFlags(VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT)
+        .build("sdf3d-ubo", &uniformBufferAllocation);
  }
  
  void SDF3D::createDescriptorSetLayout() {
@@ -270,9 +293,9 @@
      u.iTime = t;
      u.iResolution[0] = static_cast<float>(extent.width);
      u.iResolution[1] = static_cast<float>(extent.height);
-     // Disable mouse effect on camera by zeroing mouse input
-     u.iMouse[0] = 0.0f;
-     u.iMouse[1] = 0.0f;
+     // Pass mouse position to shader for interactive ball
+     u.iMouse[0] = mouseX;
+     u.iMouse[1] = mouseY;
      u.iFrame = frameCounter;
      u.enableLights[0] = enableLight1 ? 1 : 0;
      u.enableLights[1] = enableLight2 ? 1 : 0;
@@ -293,14 +316,8 @@
  }
  
  SDF3D::~SDF3D() {
-     if (device && device->getLogicalDevice()) {
-         vkDeviceWaitIdle(device->getLogicalDevice());
-         if (uniformBuffer != VK_NULL_HANDLE && uniformBufferAllocation != VK_NULL_HANDLE) {
-             vmaDestroyBuffer(device->getAllocator(), uniformBuffer, uniformBufferAllocation);
-             uniformBuffer = VK_NULL_HANDLE;
-             uniformBufferAllocation = VK_NULL_HANDLE;
-         }
-     }
+    if (device && device->getLogicalDevice()) {
+        vkDeviceWaitIdle(device->getLogicalDevice());
+        // Uniform buffer is managed by ResourceManager now; no manual destroy here
+    }
  }
- 
- 

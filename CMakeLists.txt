@@ -71,6 +71,8 @@ set(SHADERS
     ${SHADER_SOURCE_DIR}/sdf3d.frag
     ${SHADER_SOURCE_DIR}/rsm_light.frag
     ${SHADER_SOURCE_DIR}/sdf_practice.frag
+    ${SHADER_SOURCE_DIR}/sdf_mesh_main.frag
+    ${SHADER_SOURCE_DIR}/sdf_mesh_rsm.frag
 )
 
 # Compile each shader into a SPIR-V binary

@@ -37,6 +37,10 @@ struct ShaderToy3DUniforms {
 
 class SDF3D {
 public:
+#if !defined(__OHOS__)
+    // Select which monitor to use when sizing/placing the window (0-based index)
+    static constexpr int kMonitorIndex = 1;
+#endif
 #if defined(__OHOS__)
     void initVulkanOHOS(OHNativeWindow* window);
     bool initVulkan(OHNativeWindow* window);
@@ -112,4 +116,3 @@ private:
     void updateUniformBuffer(uint32_t imageIndex);
     void setupMouseCallback();
 };
-

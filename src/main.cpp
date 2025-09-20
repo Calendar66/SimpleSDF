@@ -1,5 +1,5 @@
 #ifndef APPIMPLEMENTATION
-#define APPIMPLEMENTATION 3
+#define APPIMPLEMENTATION 4
 #endif
 
 
@@ -12,6 +12,9 @@ using AppImplementation = SDF3D;
 #elif APPIMPLEMENTATION == 3
 #include "SDFCornell.hpp"
 using AppImplementation = SDFCornell;
+#elif APPIMPLEMENTATION == 4
+#include "SDFMesh.hpp"
+using AppImplementation = SDFMesh;
 #else
 #error "Invalid APPIMPLEMENTATION value."
 #endif
